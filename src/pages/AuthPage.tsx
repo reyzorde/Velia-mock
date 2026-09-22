@@ -1,50 +1,98 @@
-import { FormEvent, useEffect, useState } from 'react';
+import { FormEvent, useEffect, useRef, useState } from 'react';
 import { Loader2, Moon, Sun } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
+import { clearStoredOtp, generateOtp, sendOtpEmail, verifyStoredOtp } from '../lib/otp';
 import { isConfigured, supabase } from '../lib/supabase';
 
 const UNIT_PRICE = 100;
+type Mode = 'login' | 'register-email' | 'register-otp' | 'register-password';
 
 export default function AuthPage() {
   const nav = useNavigate();
-  const [mode, setMode] = useState<'login' | 'register'>('login');
+  const [mode, setMode] = useState<Mode>('login');
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
+  const [confirm, setConfirm] = useState('');
   const [fullName, setFullName] = useState('');
+  const [otpCode, setOtpCode] = useState('');
   const [error, setError] = useState('');
+  const [info, setInfo] = useState('');
   const [busy, setBusy] = useState(false);
   const [theme, setTheme] = useState(() => localStorage.getItem('velia_mock_theme') || 'dark');
+  const otpRefs = useRef<Array<HTMLInputElement | null>>([]);
 
   useEffect(() => {
     document.documentElement.setAttribute('data-theme', theme);
     localStorage.setItem('velia_mock_theme', theme);
   }, [theme]);
 
-  const submit = async (e: FormEvent) => {
+  const sendRegisterCode = async (e?: FormEvent) => {
+    e?.preventDefault();
+    setError('');
+    setInfo('');
+    if (!isConfigured) {
+      setError('.env da Supabase + EmailJS kalitlarini yozing.');
+      return;
+    }
+    const mail = email.trim().toLowerCase();
+    if (!mail.includes('@')) {
+      setError('Email notogri');
+      return;
+    }
+    setBusy(true);
+    try {
+      const otp = generateOtp();
+      await sendOtpEmail(mail, otp);
+      setMode('register-otp');
+      setInfo('Kod emailga yuborildi. Tasdiqlagach royxatdan otasiz.');
+      setOtpCode('');
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Kod yuborilmadi');
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  const verifyRegisterOtp = (e: FormEvent) => {
     e.preventDefault();
     setError('');
-    if (!isConfigured) {
-      setError('.env da VITE_SUPABASE_URL va VITE_SUPABASE_ANON_KEY yozing.');
+    if (otpCode.trim().length !== 6) {
+      setError('6 xonali kod kiriting');
+      return;
+    }
+    if (!verifyStoredOtp(email.trim().toLowerCase(), otpCode)) {
+      setError('Kod notogri yoki muddati otgan');
+      return;
+    }
+    clearStoredOtp();
+    setMode('register-password');
+    setInfo('Email tasdiqlandi. Ism va parol kiriting.');
+  };
+
+  const completeRegister = async (e: FormEvent) => {
+    e.preventDefault();
+    setError('');
+    if (password.length < 6) {
+      setError('Parol kamida 6 belgi');
+      return;
+    }
+    if (password !== confirm) {
+      setError('Parollar mos emas');
       return;
     }
     setBusy(true);
     try {
       const mail = email.trim().toLowerCase();
-      if (mode === 'login') {
-        const { error: err } = await supabase.auth.signInWithPassword({ email: mail, password });
-        if (err) throw new Error(err.message.includes('Invalid') ? 'Email yoki parol notogri' : err.message);
-      } else {
-        if (password.length < 6) throw new Error('Parol kamida 6 belgi');
-        const { data, error: err } = await supabase.auth.signUp({
-          email: mail,
-          password,
-          options: { data: { full_name: fullName.trim() || mail } },
-        });
-        if (err) throw new Error(err.message);
-        if (!data.session) {
-          setError('Emailga tasdiqlash xati yuborilgan bolishi mumkin. Tasdiqlab, keyin kiring.');
-          setMode('login');
-          return;
+      const { data, error: err } = await supabase.auth.signUp({
+        email: mail,
+        password,
+        options: { data: { full_name: fullName.trim() || mail } },
+      });
+      if (err) throw new Error(err.message);
+      if (!data.session) {
+        const { error: loginErr } = await supabase.auth.signInWithPassword({ email: mail, password });
+        if (loginErr) {
+          throw new Error('Hisob yaratildi. Supabase Confirm email ni ochiring (OTP EmailJS orqali), keyin kiring.');
         }
       }
       nav('/', { replace: true });
@@ -53,6 +101,47 @@ export default function AuthPage() {
     } finally {
       setBusy(false);
     }
+  };
+
+  const login = async (e: FormEvent) => {
+    e.preventDefault();
+    setError('');
+    if (!isConfigured) {
+      setError('.env sozlanmagan');
+      return;
+    }
+    setBusy(true);
+    try {
+      const { error: err } = await supabase.auth.signInWithPassword({
+        email: email.trim().toLowerCase(),
+        password,
+      });
+      if (err) {
+        throw new Error(
+          err.message.includes('Invalid')
+            ? 'Email yoki parol notogri. Avval royxatdan oting (kod tasdiqlash bilan).'
+            : err.message
+        );
+      }
+      nav('/', { replace: true });
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Xato');
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  const updateOtpDigit = (value: string, index: number) => {
+    const digits = value.replace(/\D/g, '');
+    const arr = otpCode.padEnd(6, ' ').split('').slice(0, 6);
+    if (!digits) {
+      arr[index] = ' ';
+      setOtpCode(arr.join('').replace(/ /g, ''));
+      return;
+    }
+    for (let i = 0; i < digits.length && index + i < 6; i++) arr[index + i] = digits[i];
+    setOtpCode(arr.join('').replace(/ /g, '').slice(0, 6));
+    otpRefs.current[Math.min(index + digits.length, 5)]?.focus();
   };
 
   return (
@@ -65,35 +154,61 @@ export default function AuthPage() {
             {theme === 'dark' ? <Sun size={16} /> : <Moon size={16} />}
           </button>
         </div>
-        <h1>{mode === 'login' ? 'Kirish' : "Royxatdan otish"}</h1>
+        <h1>
+          {mode === 'login' && 'Kirish'}
+          {mode === 'register-email' && 'Royxat — email'}
+          {mode === 'register-otp' && 'Kodni tasdiqlang'}
+          {mode === 'register-password' && 'Parol ornating'}
+        </h1>
         <p className="sub">
-          Email va parol. Velia oquvchisi (email mos) — markaz testlari bepul. Tashqi foydalanuvchi — {UNIT_PRICE} som/savol.
+          {mode === 'login' && `Email + parol. Velia oquvchisi bepul, tashqi — ${UNIT_PRICE} som/savol.`}
+          {mode === 'register-email' && 'Avval emailga kod. Faqat tasdiqlagach royxatdan otasiz.'}
+          {mode === 'register-otp' && `${email} ga yuborilgan 6 xonali kod.`}
+          {mode === 'register-password' && 'Email tasdiqlandi. Ism va parol bilan yakunlang.'}
         </p>
-        <div className="tabs">
-          <button type="button" className={`tab ${mode === 'login' ? 'active' : ''}`} onClick={() => setMode('login')}>Kirish</button>
-          <button type="button" className={`tab ${mode === 'register' ? 'active' : ''}`} onClick={() => setMode('register')}>Royxat</button>
-        </div>
-        <form onSubmit={submit}>
-          {error && <div className="error">{error}</div>}
-          {mode === 'register' && (
+        {(mode === 'login' || mode === 'register-email') && (
+          <div className="tabs">
+            <button type="button" className={`tab ${mode === 'login' ? 'active' : ''}`} onClick={() => { setMode('login'); setError(''); }}>Kirish</button>
+            <button type="button" className={`tab ${mode === 'register-email' ? 'active' : ''}`} onClick={() => { setMode('register-email'); setError(''); }}>Royxat</button>
+          </div>
+        )}
+        {error && <div className="error">{error}</div>}
+        {info && !error && <p className="muted" style={{ color: '#34d399' }}>{info}</p>}
+        {mode === 'login' && (
+          <form onSubmit={login}>
+            <div className="field"><label>Email</label><input type="email" value={email} onChange={(e) => setEmail(e.target.value)} required /></div>
+            <div className="field"><label>Parol</label><input type="password" value={password} onChange={(e) => setPassword(e.target.value)} required minLength={6} /></div>
+            <button className="btn btn-primary btn-block" type="submit" disabled={busy}>{busy ? <Loader2 className="spin" size={18} /> : null} Kirish</button>
+          </form>
+        )}
+        {mode === 'register-email' && (
+          <form onSubmit={sendRegisterCode}>
+            <div className="field"><label>Email</label><input type="email" value={email} onChange={(e) => setEmail(e.target.value)} required /></div>
+            <button className="btn btn-primary btn-block" type="submit" disabled={busy}>{busy ? '...' : 'Kod yuborish'}</button>
+          </form>
+        )}
+        {mode === 'register-otp' && (
+          <form onSubmit={verifyRegisterOtp}>
             <div className="field">
-              <label>Ism</label>
-              <input value={fullName} onChange={(e) => setFullName(e.target.value)} autoComplete="name" />
+              <label>Kod</label>
+              <div style={{ display: 'flex', gap: 8 }}>
+                {Array.from({ length: 6 }).map((_, i) => (
+                  <input key={i} ref={(el) => { otpRefs.current[i] = el; }} inputMode="numeric" maxLength={6} value={otpCode[i] || ''} onChange={(e) => updateOtpDigit(e.target.value, i)} style={{ width: 44, height: 48, textAlign: 'center', fontWeight: 700, borderRadius: 12, border: '1px solid var(--border)', background: 'var(--glass-2)' }} />
+                ))}
+              </div>
             </div>
-          )}
-          <div className="field">
-            <label>Email</label>
-            <input type="email" value={email} onChange={(e) => setEmail(e.target.value)} required autoComplete="email" />
-          </div>
-          <div className="field">
-            <label>Parol</label>
-            <input type="password" value={password} onChange={(e) => setPassword(e.target.value)} required minLength={6} autoComplete={mode === 'login' ? 'current-password' : 'new-password'} />
-          </div>
-          <button className="btn btn-primary btn-block" type="submit" disabled={busy}>
-            {busy ? <Loader2 className="spin" size={18} /> : null}
-            {busy ? '...' : mode === 'login' ? 'Kirish' : "Royxatdan otish"}
-          </button>
-        </form>
+            <button className="btn btn-primary btn-block" type="submit">Tasdiqlash</button>
+            <button className="btn btn-secondary btn-block" type="button" style={{ marginTop: 8 }} onClick={() => void sendRegisterCode()} disabled={busy}>Qayta yuborish</button>
+          </form>
+        )}
+        {mode === 'register-password' && (
+          <form onSubmit={completeRegister}>
+            <div className="field"><label>Ism</label><input value={fullName} onChange={(e) => setFullName(e.target.value)} /></div>
+            <div className="field"><label>Parol</label><input type="password" value={password} onChange={(e) => setPassword(e.target.value)} required minLength={6} /></div>
+            <div className="field"><label>Parolni tasdiqlang</label><input type="password" value={confirm} onChange={(e) => setConfirm(e.target.value)} required minLength={6} /></div>
+            <button className="btn btn-primary btn-block" type="submit" disabled={busy}>{busy ? '...' : 'Royxatdan otish'}</button>
+          </form>
+        )}
       </div>
     </div>
   );
