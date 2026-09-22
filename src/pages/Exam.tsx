@@ -1,13 +1,14 @@
 import { useEffect, useRef, useState } from 'react';
+import type { User } from '@supabase/supabase-js';
 import { useNavigate, useParams } from 'react-router-dom';
 import { attachExamGuards, enterExamFullscreen, stopAlarm } from '../lib/exam-security';
-import { loadSession } from '../lib/session';
+import { resolveStudent, type StudentLink } from '../lib/student';
 import { supabase } from '../lib/supabase';
 
-export default function Exam() {
+export default function Exam({ user }: { user: User }) {
   const { id } = useParams();
   const nav = useNavigate();
-  const session = loadSession();
+  const [student, setStudent] = useState<StudentLink | null>(null);
   const [test, setTest] = useState<{ title: string; duration_minutes: number } | null>(null);
   const [questions, setQuestions] = useState<Array<{ id: string; prompt: string; points: number; image_url?: string | null }>>([]);
   const [options, setOptions] = useState<Record<string, Array<{ id: string; label: string; is_correct: boolean }>>>({});
@@ -22,11 +23,12 @@ export default function Exam() {
   const exitTimerRef = useRef<number | null>(null);
 
   useEffect(() => {
-    if (!session) { nav('/login'); return; }
     void (async () => {
-      if (session.kind === 'public') {
-        const { data: paid } = await supabase.from('mock_test_payments').select('id').eq('test_id', id!).eq('public_user_id', session.public_id).eq('status', 'paid').maybeSingle();
-        if (!paid) { nav(`/pay/${id}`); return; }
+      const st = await resolveStudent(user.email || undefined);
+      setStudent(st);
+      if (!st) {
+        const { data: paid } = await supabase.from('mock_test_payments').select('id').eq('test_id', id!).eq('user_id', user.id).eq('status', 'paid').maybeSingle();
+        if (!paid) { nav(`/pay/${id}`, { replace: true }); return; }
       }
       const { data: t } = await supabase.from('mock_tests').select('title, duration_minutes').eq('id', id!).maybeSingle();
       setTest(t);
@@ -40,7 +42,7 @@ export default function Exam() {
       }
       setOptions(map);
     })();
-  }, [id, nav, session]);
+  }, [id, nav, user]);
 
   const finish = async (auto = false) => {
     if (finishedRef.current) return;
@@ -60,7 +62,7 @@ export default function Exam() {
       correct_count: correct, wrong_count: questions.length - correct,
       status: auto ? 'auto_submitted' : 'completed', completed_at: new Date().toISOString(),
     };
-    if (session?.kind === 'velia') { payload.student_id = session.student_id; payload.center_id = session.center_id; }
+    if (student) { payload.student_id = student.id; payload.center_id = student.center_id; }
     await supabase.from('mock_attempts').insert(payload);
     setDone({ score, max });
     try { await document.exitFullscreen?.(); } catch { /* */ }
@@ -72,7 +74,7 @@ export default function Exam() {
     await enterExamFullscreen();
     cleanupRef.current = attachExamGuards(() => {
       setWarn(true);
-      if (session?.kind === 'public') setExitCountdown(30);
+      if (!student) setExitCountdown(30);
       else void finish(true);
     });
   };
@@ -100,20 +102,20 @@ export default function Exam() {
 
   if (done) {
     return (
-      <div className="page"><div className="card">
+      <div className="page"><div className="glass card" style={{ maxWidth: 480 }}>
         <h1>Natija</h1>
-        <p style={{ fontSize: 28, fontWeight: 800 }}>{done.score} / {done.max}</p>
+        <p style={{ fontSize: 32, fontWeight: 800 }}>{done.score} / {done.max}</p>
         <button className="btn btn-primary" type="button" onClick={() => nav('/')}>Bosh sahifa</button>
       </div></div>
     );
   }
-  if (!test) return <div className="page">Yuklanmoqda...</div>;
+  if (!test) return <div className="auth-wrap">Yuklanmoqda...</div>;
   if (confirmStart) {
     return (
-      <div className="page"><div className="card">
+      <div className="page"><div className="glass card" style={{ maxWidth: 560 }}>
         <h1>{test.title}</h1>
         <p className="muted">Vaqt: {test.duration_minutes} daqiqa · savollar: {questions.length || '...'}</p>
-        <p>Fullscreen · chiqib ketsangiz signal ishlaydi.</p>
+        <p>Fullscreen rejim. Chiqib ketsangiz signal ishlaydi.</p>
         <button className="btn btn-primary" type="button" onClick={() => void startExam()} disabled={!questions.length}>Boshlash</button>
       </div></div>
     );
@@ -125,21 +127,24 @@ export default function Exam() {
   return (
     <div className="page">
       {(warn || exitCountdown != null) && (
-        <div className="overlay"><div className="card" style={{ maxWidth: 420 }}>
+        <div className="overlay"><div className="glass card" style={{ maxWidth: 420 }}>
           <h2 style={{ color: '#fecaca' }}>Diqqat!</h2>
           <p>Fullscreen dan chiqdingiz.</p>
-          {session?.kind === 'public' && exitCountdown != null && <p><strong>{exitCountdown}</strong> soniya ichida qayting.</p>}
+          {!student && exitCountdown != null && <p><strong>{exitCountdown}</strong> soniya ichida qayting.</p>}
           <button className="btn btn-primary" type="button" onClick={() => void resume()}>Testga qaytish</button>
         </div></div>
       )}
-      <div className="top">
-        <div><h1 style={{ margin: '0 0 4px', fontSize: '1.15rem' }}>{test.title}</h1><p className="muted">Savollar: {questions.length}</p></div>
+      <div className="layout-top">
+        <div>
+          <h1 style={{ fontSize: '1.2rem', marginBottom: 4 }}>{test.title}</h1>
+          <p className="muted">Savollar: {questions.length}</p>
+        </div>
         <div className="timer">{String(mm).padStart(2, '0')}:{String(ss).padStart(2, '0')}</div>
       </div>
       {questions.map((q, i) => (
-        <div className="card" key={q.id}>
+        <div className="glass card" key={q.id}>
           <strong>{i + 1}. {q.prompt}</strong>
-          {q.image_url && <img src={q.image_url} alt="" style={{ maxWidth: '100%', marginTop: 8, borderRadius: 8 }} />}
+          {q.image_url && <img src={q.image_url} alt="" style={{ maxWidth: '100%', marginTop: 10, borderRadius: 10 }} />}
           {(options[q.id] || []).map((o) => (
             <button key={o.id} type="button" className={`opt ${answers[q.id] === o.id ? 'active' : ''}`} onClick={() => setAnswers((a) => ({ ...a, [q.id]: o.id }))}>{o.label}</button>
           ))}
