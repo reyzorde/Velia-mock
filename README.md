@@ -1,10 +1,11 @@
-# Setup
+# Velia Mock
+
+Email + password auth. Desktop-first glass UI.
 
 ```bash
 npm install
 cp .env.example .env
-# fill VITE_SUPABASE_URL and VITE_SUPABASE_ANON_KEY locally only
 npm run dev
 ```
 
-Do not commit `.env`.
+Never commit `.env`.

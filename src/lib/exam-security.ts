@@ -5,18 +5,13 @@ function beep() {
     if (!audioCtx) audioCtx = new AudioContext();
     const o = audioCtx.createOscillator();
     const g = audioCtx.createGain();
-    o.type = 'square';
-    o.frequency.value = 880;
-    g.gain.value = 0.35;
-    o.connect(g);
-    g.connect(audioCtx.destination);
-    o.start();
-    o.stop(audioCtx.currentTime + 0.2);
+    o.type = 'square'; o.frequency.value = 880; g.gain.value = 0.35;
+    o.connect(g); g.connect(audioCtx.destination);
+    o.start(); o.stop(audioCtx.currentTime + 0.2);
   } catch { /* */ }
 }
 export function startAlarm() {
-  stopAlarm();
-  beep();
+  stopAlarm(); beep();
   alarmTimer = window.setInterval(() => beep(), 400);
 }
 export function stopAlarm() {
@@ -31,9 +26,7 @@ export function attachExamGuards(onExit: () => void) {
     if (!document.fullscreenElement) { startAlarm(); onExit(); }
     else stopAlarm();
   };
-  const onVis = () => {
-    if (document.hidden) { startAlarm(); onExit(); }
-  };
+  const onVis = () => { if (document.hidden) { startAlarm(); onExit(); } };
   document.addEventListener('fullscreenchange', onFs);
   document.addEventListener('visibilitychange', onVis);
   return () => {
