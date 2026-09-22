@@ -81,18 +81,28 @@ export default function AuthPage() {
       return;
     }
     setBusy(true);
+    const mail = email.trim().toLowerCase();
     try {
-      const mail = email.trim().toLowerCase();
+      const { error: tryLogin } = await supabase.auth.signInWithPassword({ email: mail, password });
+      if (!tryLogin) {
+        nav('/', { replace: true });
+        return;
+      }
       const { data, error: err } = await supabase.auth.signUp({
         email: mail,
         password,
         options: { data: { full_name: fullName.trim() || mail } },
       });
-      if (err) throw new Error(err.message);
+      if (err) {
+        if (err.status === 422 || /already|registered|exists/i.test(err.message)) {
+          throw new Error('Bu email allaqachon bor. «Kirish» orqali to\'g\'ri parol bilan kiring.');
+        }
+        throw new Error(err.message);
+      }
       if (!data.session) {
         const { error: loginErr } = await supabase.auth.signInWithPassword({ email: mail, password });
         if (loginErr) {
-          throw new Error('Hisob yaratildi. Supabase Confirm email ni ochiring (OTP EmailJS orqali), keyin kiring.');
+          throw new Error('Hisob yaratildi. Supabase Confirm email ni OCHIRING (OTP EmailJS orqali), keyin kiring.');
         }
       }
       nav('/', { replace: true });
@@ -176,14 +186,14 @@ export default function AuthPage() {
         {info && !error && <p className="muted" style={{ color: '#34d399' }}>{info}</p>}
         {mode === 'login' && (
           <form onSubmit={login}>
-            <div className="field"><label>Email</label><input type="email" value={email} onChange={(e) => setEmail(e.target.value)} required /></div>
-            <div className="field"><label>Parol</label><input type="password" value={password} onChange={(e) => setPassword(e.target.value)} required minLength={6} /></div>
+            <div className="field"><label>Email</label><input type="email" name="email" autoComplete="username" value={email} onChange={(e) => setEmail(e.target.value)} required /></div>
+            <div className="field"><label>Parol</label><input type="password" name="password" autoComplete="current-password" value={password} onChange={(e) => setPassword(e.target.value)} required minLength={6} /></div>
             <button className="btn btn-primary btn-block" type="submit" disabled={busy}>{busy ? <Loader2 className="spin" size={18} /> : null} Kirish</button>
           </form>
         )}
         {mode === 'register-email' && (
           <form onSubmit={sendRegisterCode}>
-            <div className="field"><label>Email</label><input type="email" value={email} onChange={(e) => setEmail(e.target.value)} required /></div>
+            <div className="field"><label>Email</label><input type="email" value={email} onChange={(e) => setEmail(e.target.value)} required autoComplete="email" /></div>
             <button className="btn btn-primary btn-block" type="submit" disabled={busy}>{busy ? '...' : 'Kod yuborish'}</button>
           </form>
         )}
@@ -203,9 +213,10 @@ export default function AuthPage() {
         )}
         {mode === 'register-password' && (
           <form onSubmit={completeRegister}>
+            <input type="email" name="username" autoComplete="username" value={email} readOnly hidden aria-hidden />
             <div className="field"><label>Ism</label><input value={fullName} onChange={(e) => setFullName(e.target.value)} /></div>
-            <div className="field"><label>Parol</label><input type="password" value={password} onChange={(e) => setPassword(e.target.value)} required minLength={6} /></div>
-            <div className="field"><label>Parolni tasdiqlang</label><input type="password" value={confirm} onChange={(e) => setConfirm(e.target.value)} required minLength={6} /></div>
+            <div className="field"><label>Parol</label><input type="password" name="new-password" autoComplete="new-password" value={password} onChange={(e) => setPassword(e.target.value)} required minLength={6} /></div>
+            <div className="field"><label>Parolni tasdiqlang</label><input type="password" autoComplete="new-password" value={confirm} onChange={(e) => setConfirm(e.target.value)} required minLength={6} /></div>
             <button className="btn btn-primary btn-block" type="submit" disabled={busy}>{busy ? '...' : 'Royxatdan otish'}</button>
           </form>
         )}
