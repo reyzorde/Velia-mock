@@ -162,7 +162,7 @@ export default function Home({ user }: { user: User }) {
         <main className="app-main">
           <section className="main-block">
             <h1>Testlar</h1>
-            <p className="muted">Kod orqali qidiring yoki ro\u2018yxatdan tanlang.</p>
+            <p className="muted">Kod orqali qidiring yoki ro'yxatdan tanlang.</p>
           </section>
 
           <div className="content-grid">
