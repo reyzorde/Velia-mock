@@ -46,7 +46,7 @@ export default function AuthPage() {
       const otp = generateOtp();
       await sendOtpEmail(mail, otp);
       setMode('register-otp');
-      setInfo('Kod emailga yuborildi. Tasdiqlagach ro\'yxatdan o\'tasiz.');
+      setInfo("Kod emailga yuborildi. Tasdiqlagach ro'yxatdan o'tasiz.");
       setOtpCode('');
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Kod yuborilmadi');
@@ -63,7 +63,7 @@ export default function AuthPage() {
       return;
     }
     if (!verifyStoredOtp(email.trim().toLowerCase(), otpCode)) {
-      setError('Kod noto\'g\'ri yoki muddati o\'tgan');
+      setError("Kod noto'g'ri yoki muddati o'tgan");
       return;
     }
     clearStoredOtp();
@@ -97,7 +97,7 @@ export default function AuthPage() {
       });
       if (err) {
         if (err.status === 422 || /already|registered|exists/i.test(err.message)) {
-          throw new Error('Bu email allaqachon bor. «Kirish» orqali to\'g\'ri parol bilan kiring.');
+          throw new Error("Bu email allaqachon bor. «Kirish» orqali to'g'ri parol bilan kiring.");
         }
         throw new Error(err.message);
       }
@@ -131,7 +131,7 @@ export default function AuthPage() {
       if (err) {
         throw new Error(
           err.message.includes('Invalid')
-            ? 'Email yoki parol noto\'g\'ri. Avval ro\'yxatdan o\'ting.'
+            ? "Email yoki parol noto'gri. Avval ro'yxatdan oting."
             : err.message
         );
       }
@@ -174,20 +174,20 @@ export default function AuthPage() {
         </div>
         <h1>
           {mode === 'login' && 'Kirish'}
-          {mode === 'register-email' && 'Ro\'yxat — email'}
+          {mode === 'register-email' && "Ro'yxat — email"}
           {mode === 'register-otp' && 'Kodni tasdiqlang'}
-          {mode === 'register-password' && 'Parol o\'rnating'}
+          {mode === 'register-password' && "Parol o'rnating"}
         </h1>
         <p className="sub">
-          {mode === 'login' && `Email + parol. Velia o\'quvchisi bepul, tashqi — ${UNIT_PRICE} so\'m/savol.`}
-          {mode === 'register-email' && 'Avval emailga kod. Faqat tasdiqlagach ro\'yxatdan o\'tasiz.'}
+          {mode === 'login' && "Email + parol. Velia o'quvchisi bepul, tashqi — ${UNIT_PRICE} so'm/savol."}
+          {mode === 'register-email' && "Avval emailga kod. Faqat tasdiqlagach ro'yxatdan o'tasiz."}
           {mode === 'register-otp' && `${email} ga yuborilgan 6 xonali kod.`}
           {mode === 'register-password' && 'Email tasdiqlandi. Ism va parol bilan yakunlang.'}
         </p>
         {(mode === 'login' || mode === 'register-email') && (
           <div className="tabs">
             <button type="button" className={`tab ${mode === 'login' ? 'active' : ''}`} onClick={() => { setMode('login'); setError(''); }}>Kirish</button>
-            <button type="button" className={`tab ${mode === 'register-email' ? 'active' : ''}`} onClick={() => { setMode('register-email'); setError(''); }}>Ro\'yxat</button>
+            <button type="button" className={`tab ${mode === 'register-email' ? 'active' : ''}`} onClick={() => { setMode('register-email'); setError(''); }}>Ro'yxat</button>
           </div>
         )}
         {error && <div className="error">{error}</div>}

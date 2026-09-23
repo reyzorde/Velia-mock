@@ -205,7 +205,7 @@ export default function Home({ user }: { user: User }) {
                     <div className="muted" style={{ display: 'flex', gap: 8, alignItems: 'center', marginTop: 4 }}>
                       <Clock size={12} />
                       {t.public_code} · {t.duration_minutes} daq ·{' '}
-                      {student ? 'bepul' : `${UNIT_PRICE} so\u2018m/savol`}
+                      {student ? 'bepul' : `${UNIT_PRICE} so'm/savol`}
                     </div>
                   </button>
                 ))}

@@ -43,7 +43,7 @@ export default function Login() {
         const sp = (s.phone || '').replace(/\D/g, '');
         return sp.endsWith(tail) || sp.includes(tail);
       });
-      if (!matched.length) throw new Error('Velia oquvchisi topilmadi. Royxatdan oting (pullik).');
+      if (!matched.length) throw new Error("Velia oquvchisi topilmadi. Ro'yxatdan oting (pullik).");
       const s = matched[0];
       saveSession({ kind: 'velia', student_id: s.id, full_name: s.full_name, center_id: s.center_id, phone: s.phone || phone });
       nav('/');
@@ -82,15 +82,15 @@ export default function Login() {
         </button>
       </div>
       <h1>Mock test platformasi</h1>
-      <p className="muted">Velia oquvchisi (ism + telefon) bepul. Tashqi — {UNIT_PRICE} som/savol. UUID yoq.</p>
+      <p className="muted">Velia oquvchisi (ism + telefon) bepul. Tashqi — {UNIT_PRICE} so'm/savol. UUID yoq.</p>
       <div className="tabs">
         <button type="button" className={`tab ${tab === 'velia' ? 'active' : ''}`} onClick={() => setTab('velia')}>Velia oquvchisi</button>
-        <button type="button" className={`tab ${tab === 'register' ? 'active' : ''}`} onClick={() => setTab('register')}>Royxatdan otish</button>
+        <button type="button" className={`tab ${tab === 'register' ? 'active' : ''}`} onClick={() => setTab('register')}>Ro'yxatdan o'tish</button>
       </div>
       {tab === 'velia' ? (
         <form className="card" onSubmit={loginVelia}>
           {error && <div className="error">{error}</div>}
-          <div className="field"><label>Toliq ism</label><input className="input" value={fullName} onChange={(e) => setFullName(e.target.value)} required /></div>
+          <div className="field"><label>To'liq ism</label><input className="input" value={fullName} onChange={(e) => setFullName(e.target.value)} required /></div>
           <div className="field"><label>Telefon</label><input className="input" value={phone} onChange={(e) => setPhone(e.target.value)} required inputMode="tel" placeholder="+998..." /></div>
           <button className="btn btn-primary btn-block" type="submit" disabled={busy}>{busy ? <Loader2 size={18} /> : null} {busy ? '...' : 'Kirish (bepul)'}</button>
         </form>
