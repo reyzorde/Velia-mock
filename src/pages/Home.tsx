@@ -1,6 +1,8 @@
 import { FormEvent, useEffect, useState } from 'react';
 import type { User } from '@supabase/supabase-js';
-import { Loader2, LogOut, Search } from 'lucide-react';
+import {
+  BookOpen, Clock, Loader2, LogOut, Moon, Search, Sun, User as UserIcon,
+} from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import logoLight from '../assets/velia-logo.png';
 import logoDark from '../assets/velia-night-logo.png';
@@ -13,36 +15,51 @@ export default function Home({ user }: { user: User }) {
   const nav = useNavigate();
   const [student, setStudent] = useState<StudentLink | null>(null);
   const [code, setCode] = useState('');
-  const [tests, setTests] = useState<Array<{ id: string; title: string; public_code: string; duration_minutes: number; center_id: string | null }>>([]);
+  const [tests, setTests] = useState<
+    Array<{ id: string; title: string; public_code: string; duration_minutes: number; center_id: string | null }>
+  >([]);
   const [error, setError] = useState('');
-  const [ready, setReady] = useState(false);
-  const theme = localStorage.getItem('velia_mock_theme') || 'dark';
+  const [loadingTests, setLoadingTests] = useState(true);
+  const [theme, setTheme] = useState(() => localStorage.getItem('velia_mock_theme') || 'dark');
 
   useEffect(() => {
     document.documentElement.setAttribute('data-theme', theme);
+    localStorage.setItem('velia_mock_theme', theme);
+  }, [theme]);
+
+  useEffect(() => {
+    let active = true;
     void (async () => {
-      const st = await resolveStudent(user.email || undefined);
-      setStudent(st);
-      if (st) {
-        const { data } = await supabase
-          .from('mock_tests')
-          .select('id, title, public_code, duration_minutes, center_id')
-          .eq('is_published', true)
-          .eq('center_id', st.center_id)
-          .order('created_at', { ascending: false });
-        setTests(data || []);
-      } else {
-        const { data } = await supabase
-          .from('mock_tests')
-          .select('id, title, public_code, duration_minutes, center_id')
-          .eq('is_published', true)
-          .order('created_at', { ascending: false })
-          .limit(40);
-        setTests(data || []);
+      setLoadingTests(true);
+      try {
+        const st = await resolveStudent(user.email || undefined);
+        if (!active) return;
+        setStudent(st);
+        if (st) {
+          const { data } = await supabase
+            .from('mock_tests')
+            .select('id, title, public_code, duration_minutes, center_id')
+            .eq('is_published', true)
+            .eq('center_id', st.center_id)
+            .order('created_at', { ascending: false });
+          if (active) setTests(data || []);
+        } else {
+          const { data } = await supabase
+            .from('mock_tests')
+            .select('id, title, public_code, duration_minutes, center_id')
+            .eq('is_published', true)
+            .order('created_at', { ascending: false })
+            .limit(40);
+          if (active) setTests(data || []);
+        }
+      } finally {
+        if (active) setLoadingTests(false);
       }
-      setReady(true);
     })();
-  }, [user.email, theme]);
+    return () => {
+      active = false;
+    };
+  }, [user.email]);
 
   const openTest = async (testId: string) => {
     if (student) {
@@ -73,80 +90,128 @@ export default function Home({ user }: { user: User }) {
       return;
     }
     if (student && data.center_id && data.center_id !== student.center_id) {
-      setError('Bu test boshqa markazniki — tashqi rejimda pullik.');
+      setError("Bu test boshqa markazniki — tashqi rejimda pullik.");
       return;
     }
     await openTest(data.id);
   };
 
-  if (!ready) {
-    return (
-      <div className="auth-wrap">
-        <Loader2 className="spin" size={28} />
-      </div>
-    );
-  }
+  const displayName =
+    student?.full_name || user.user_metadata?.full_name || user.email || 'Foydalanuvchi';
 
   return (
-    <div className="page">
-      <div className="layout-top">
-        <div>
-          <div className="brand" style={{ marginBottom: 8 }}>
-            <img
-              src={theme === 'dark' ? logoDark : logoLight}
-              alt="Velia"
-              className="brand-logo"
-            />
-            <div className="brand-name">Mock</div>
-          </div>
-          <h1 style={{ fontSize: '1.35rem' }}>
-            {student?.full_name || user.user_metadata?.full_name || user.email}
-          </h1>
-          <p className="muted">
-            {student
-              ? 'Velia o‘quvchisi · markaz testlari bepul'
-              : `Tashqi foydalanuvchi · ${UNIT_PRICE} so‘m / savol`}
-          </p>
-        </div>
-        <button
-          className="btn btn-secondary"
-          type="button"
-          onClick={async () => {
-            await supabase.auth.signOut();
-            nav('/login', { replace: true });
-          }}
-        >
-          <LogOut size={16} /> Chiqish
-        </button>
-      </div>
-      <div className="grid-2">
-        <form className="glass card" onSubmit={search}>
-          <h2>Test kodi</h2>
-          <p className="muted">Markaz bergan kod (masalan VL-MK-A1B2C3)</p>
-          <input
-            className="input"
-            value={code}
-            onChange={(e) => setCode(e.target.value)}
-            placeholder="VL-MK-..."
+    <div className="app-shell">
+      <header className="app-header">
+        <div className="app-header-left">
+          <img
+            src={theme === 'dark' ? logoDark : logoLight}
+            alt="Velia"
+            className="brand-logo"
           />
-          {error && <div className="error" style={{ marginTop: 12 }}>{error}</div>}
-          <button className="btn btn-primary" type="submit" style={{ marginTop: 14 }}>
-            <Search size={16} /> Topish
-          </button>
-        </form>
-        <div className="glass card">
-          <h2>Mavjud testlar</h2>
-          {!tests.length && <p className="muted">Hali test yo‘q</p>}
-          {tests.map((t) => (
-            <button key={t.id} type="button" className="test-item" onClick={() => void openTest(t.id)}>
-              <div style={{ fontWeight: 700 }}>{t.title}</div>
-              <div className="muted">
-                {t.public_code} · {t.duration_minutes} daq ·{' '}
-                {student ? 'bepul' : `${UNIT_PRICE} so‘m/savol`}
-              </div>
-            </button>
-          ))}
+          <div>
+            <div className="app-title">Velia Mock</div>
+            <div className="muted" style={{ fontSize: 12 }}>Imtihon platformasi</div>
+          </div>
         </div>
+        <div className="app-header-right">
+          <button
+            type="button"
+            className="btn btn-ghost btn-sm"
+            aria-label="Theme"
+            onClick={() => setTheme((t) => (t === 'dark' ? 'light' : 'dark'))}
+          >
+            {theme === 'dark' ? <Sun size={16} /> : <Moon size={16} />}
+          </button>
+          <div className="user-chip">
+            <UserIcon size={14} />
+            <span>{displayName}</span>
+          </div>
+          <button
+            type="button"
+            className="btn btn-secondary btn-sm"
+            onClick={async () => {
+              await supabase.auth.signOut();
+              nav('/login', { replace: true });
+            }}
+          >
+            <LogOut size={14} /> Chiqish
+          </button>
+        </div>
+      </header>
+
+      <div className="app-body">
+        <aside className="app-side">
+          <div className="side-card">
+            <div className="eyebrow">Holat</div>
+            <strong>{student ? 'Velia o\u2018quvchisi' : 'Tashqi foydalanuvchi'}</strong>
+            <p className="muted" style={{ marginTop: 8, fontSize: 13 }}>
+              {student
+                ? 'Markaz testlari bepul'
+                : `${UNIT_PRICE} so\u2018m / savol`}
+            </p>
+          </div>
+          <div className="side-card">
+            <div className="eyebrow">Statistika</div>
+            <div className="side-stat">
+              <BookOpen size={16} />
+              <span>{tests.length} ta test</span>
+            </div>
+          </div>
+        </aside>
+
+        <main className="app-main">
+          <section className="main-block">
+            <h1>Testlar</h1>
+            <p className="muted">Kod orqali qidiring yoki ro\u2018yxatdan tanlang.</p>
+          </section>
+
+          <div className="content-grid">
+            <form className="panel" onSubmit={search}>
+              <h2>Test kodi</h2>
+              <p className="muted">Markaz bergan kod (masalan VL-MK-A1B2C3)</p>
+              <input
+                className="input"
+                value={code}
+                onChange={(e) => setCode(e.target.value)}
+                placeholder="VL-MK-..."
+                autoComplete="off"
+              />
+              {error && <div className="error" style={{ marginTop: 12 }}>{error}</div>}
+              <button className="btn btn-primary" type="submit" style={{ marginTop: 14 }}>
+                <Search size={16} /> Topish
+              </button>
+            </form>
+
+            <div className="panel">
+              <h2>Mavjud testlar</h2>
+              {loadingTests && (
+                <div className="inline-load">
+                  <Loader2 className="spin" size={20} />
+                  <span className="muted">Yuklanmoqda...</span>
+                </div>
+              )}
+              {!loadingTests && !tests.length && (
+                <p className="muted">Hali test yo\u2018q</p>
+              )}
+              {!loadingTests &&
+                tests.map((t) => (
+                  <button
+                    key={t.id}
+                    type="button"
+                    className="test-item"
+                    onClick={() => void openTest(t.id)}
+                  >
+                    <div style={{ fontWeight: 700 }}>{t.title}</div>
+                    <div className="muted" style={{ display: 'flex', gap: 8, alignItems: 'center', marginTop: 4 }}>
+                      <Clock size={12} />
+                      {t.public_code} · {t.duration_minutes} daq ·{' '}
+                      {student ? 'bepul' : `${UNIT_PRICE} so\u2018m/savol`}
+                    </div>
+                  </button>
+                ))}
+            </div>
+          </div>
+        </main>
       </div>
     </div>
   );

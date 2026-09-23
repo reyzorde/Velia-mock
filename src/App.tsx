@@ -11,8 +11,14 @@ const Exam = lazy(() => import('./pages/Exam'));
 
 function Spin() {
   return (
-    <div className="auth-wrap">
-      <Loader2 className="spin" size={28} />
+    <div className="app-shell" style={{ minHeight: '100dvh' }}>
+      <header className="app-header">
+        <div className="app-title">Velia Mock</div>
+      </header>
+      <main className="app-main" style={{ display: 'flex', alignItems: 'center', gap: 10, padding: 24 }}>
+        <Loader2 className="spin" size={22} />
+        <span className="muted">Sessiya tekshirilmoqda...</span>
+      </main>
     </div>
   );
 }
