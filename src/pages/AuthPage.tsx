@@ -1,6 +1,8 @@
 import { FormEvent, useEffect, useRef, useState } from 'react';
 import { Loader2, Moon, Sun } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
+import logoLight from '../assets/velia-logo.png';
+import logoDark from '../assets/velia-night-logo.png';
 import { clearStoredOtp, generateOtp, sendOtpEmail, verifyStoredOtp } from '../lib/otp';
 import { isConfigured, supabase } from '../lib/supabase';
 
@@ -36,7 +38,7 @@ export default function AuthPage() {
     }
     const mail = email.trim().toLowerCase();
     if (!mail.includes('@')) {
-      setError('Email notogri');
+      setError('Email noto\'g\'ri');
       return;
     }
     setBusy(true);
@@ -44,7 +46,7 @@ export default function AuthPage() {
       const otp = generateOtp();
       await sendOtpEmail(mail, otp);
       setMode('register-otp');
-      setInfo('Kod emailga yuborildi. Tasdiqlagach royxatdan otasiz.');
+      setInfo('Kod emailga yuborildi. Tasdiqlagach ro\'yxatdan o\'tasiz.');
       setOtpCode('');
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Kod yuborilmadi');
@@ -61,7 +63,7 @@ export default function AuthPage() {
       return;
     }
     if (!verifyStoredOtp(email.trim().toLowerCase(), otpCode)) {
-      setError('Kod notogri yoki muddati otgan');
+      setError('Kod noto\'g\'ri yoki muddati o\'tgan');
       return;
     }
     clearStoredOtp();
@@ -102,7 +104,7 @@ export default function AuthPage() {
       if (!data.session) {
         const { error: loginErr } = await supabase.auth.signInWithPassword({ email: mail, password });
         if (loginErr) {
-          throw new Error('Hisob yaratildi. Supabase Confirm email ni OCHIRING (OTP EmailJS orqali), keyin kiring.');
+          throw new Error('Hisob yaratildi. Supabase Confirm email ni OCHIRING, keyin kiring.');
         }
       }
       nav('/', { replace: true });
@@ -129,7 +131,7 @@ export default function AuthPage() {
       if (err) {
         throw new Error(
           err.message.includes('Invalid')
-            ? 'Email yoki parol notogri. Avval royxatdan oting (kod tasdiqlash bilan).'
+            ? 'Email yoki parol noto\'g\'ri. Avval ro\'yxatdan o\'ting.'
             : err.message
         );
       }
@@ -158,28 +160,34 @@ export default function AuthPage() {
     <div className="auth-wrap">
       <div className="glass auth-card">
         <div className="brand">
-          <div className="brand-mark">M</div>
-          <div className="brand-name">Velia Mock</div>
-          <button className="btn btn-secondary" type="button" style={{ marginLeft: 'auto', padding: '8px 10px' }} onClick={() => setTheme((t) => (t === 'dark' ? 'light' : 'dark'))}>
+          <img src={theme === 'dark' ? logoDark : logoLight} alt="Velia" className="brand-logo" />
+          <div className="brand-name">Mock</div>
+          <button
+            className="btn btn-ghost btn-sm"
+            type="button"
+            style={{ marginLeft: 'auto' }}
+            onClick={() => setTheme((t) => (t === 'dark' ? 'light' : 'dark'))}
+            aria-label="Theme"
+          >
             {theme === 'dark' ? <Sun size={16} /> : <Moon size={16} />}
           </button>
         </div>
         <h1>
           {mode === 'login' && 'Kirish'}
-          {mode === 'register-email' && 'Royxat — email'}
+          {mode === 'register-email' && 'Ro\'yxat — email'}
           {mode === 'register-otp' && 'Kodni tasdiqlang'}
-          {mode === 'register-password' && 'Parol ornating'}
+          {mode === 'register-password' && 'Parol o\'rnating'}
         </h1>
         <p className="sub">
-          {mode === 'login' && `Email + parol. Velia oquvchisi bepul, tashqi — ${UNIT_PRICE} som/savol.`}
-          {mode === 'register-email' && 'Avval emailga kod. Faqat tasdiqlagach royxatdan otasiz.'}
+          {mode === 'login' && `Email + parol. Velia o\'quvchisi bepul, tashqi — ${UNIT_PRICE} so\'m/savol.`}
+          {mode === 'register-email' && 'Avval emailga kod. Faqat tasdiqlagach ro\'yxatdan o\'tasiz.'}
           {mode === 'register-otp' && `${email} ga yuborilgan 6 xonali kod.`}
           {mode === 'register-password' && 'Email tasdiqlandi. Ism va parol bilan yakunlang.'}
         </p>
         {(mode === 'login' || mode === 'register-email') && (
           <div className="tabs">
             <button type="button" className={`tab ${mode === 'login' ? 'active' : ''}`} onClick={() => { setMode('login'); setError(''); }}>Kirish</button>
-            <button type="button" className={`tab ${mode === 'register-email' ? 'active' : ''}`} onClick={() => { setMode('register-email'); setError(''); }}>Royxat</button>
+            <button type="button" className={`tab ${mode === 'register-email' ? 'active' : ''}`} onClick={() => { setMode('register-email'); setError(''); }}>Ro\'yxat</button>
           </div>
         )}
         {error && <div className="error">{error}</div>}
@@ -201,9 +209,9 @@ export default function AuthPage() {
           <form onSubmit={verifyRegisterOtp}>
             <div className="field">
               <label>Kod</label>
-              <div style={{ display: 'flex', gap: 8 }}>
+              <div className="otp-row">
                 {Array.from({ length: 6 }).map((_, i) => (
-                  <input key={i} ref={(el) => { otpRefs.current[i] = el; }} inputMode="numeric" maxLength={6} value={otpCode[i] || ''} onChange={(e) => updateOtpDigit(e.target.value, i)} style={{ width: 44, height: 48, textAlign: 'center', fontWeight: 700, borderRadius: 12, border: '1px solid var(--border)', background: 'var(--glass-2)' }} />
+                  <input key={i} ref={(el) => { otpRefs.current[i] = el; }} inputMode="numeric" maxLength={6} value={otpCode[i] || ''} onChange={(e) => updateOtpDigit(e.target.value, i)} />
                 ))}
               </div>
             </div>
@@ -217,7 +225,7 @@ export default function AuthPage() {
             <div className="field"><label>Ism</label><input value={fullName} onChange={(e) => setFullName(e.target.value)} /></div>
             <div className="field"><label>Parol</label><input type="password" name="new-password" autoComplete="new-password" value={password} onChange={(e) => setPassword(e.target.value)} required minLength={6} /></div>
             <div className="field"><label>Parolni tasdiqlang</label><input type="password" autoComplete="new-password" value={confirm} onChange={(e) => setConfirm(e.target.value)} required minLength={6} /></div>
-            <button className="btn btn-primary btn-block" type="submit" disabled={busy}>{busy ? '...' : 'Royxatdan otish'}</button>
+            <button className="btn btn-primary btn-block" type="submit" disabled={busy}>{busy ? '...' : "Ro'yxatdan o'tish"}</button>
           </form>
         )}
       </div>
